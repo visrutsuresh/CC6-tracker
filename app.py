@@ -231,12 +231,16 @@ with cols[2]:
 # Pop-emoji animation (unique id each time so CSS animation replays)
 if st.session_state.pop_emoji:
     uid = st.session_state.pop_emoji_id
-    st.markdown(
-        f'<div class="pop-emoji-overlay" id="pop-emoji-{uid}">'
+    emoji_container = st.empty()
+    emoji_container.markdown(
+        f'<div class="pop-emoji-overlay" key="{uid}">'
         f'<span class="pop-emoji">{st.session_state.pop_emoji}</span>'
         f'</div>',
         unsafe_allow_html=True,
     )
+    import time
+    time.sleep(0.7)  # Match animation duration
+    emoji_container.empty()
     st.session_state.pop_emoji = None
 
 st.divider()
