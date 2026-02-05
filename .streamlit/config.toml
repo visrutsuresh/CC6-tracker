@@ -6,9 +6,3 @@ headless = true
 
 [theme]
 primaryColor = "#22c55e"
-
- [global]
- showEmailPrompt = false
-
- [server]
- headless = true
