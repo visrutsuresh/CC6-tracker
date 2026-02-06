@@ -1,6 +1,10 @@
 # Professor Phrase Tracker
 
-Track how many times your professor says **"ARE YOU WITH ME?"** and **"THUMBS UP"** using a simple web app built with Python, Streamlit, and pandas.
+Track how many times my professor says **"ARE YOU WITH ME?"** and **"THUMBS UP"** using a simple web app built with Python, Streamlit, and pandas.
+
+## Public lnk
+
+https://cc6-tracker.streamlit.app/
 
 ## Setup
 
