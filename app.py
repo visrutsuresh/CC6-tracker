@@ -248,6 +248,12 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ---------- Initialize admin session state (before top bar uses it) ----------
+if "is_admin" not in st.session_state:
+    st.session_state.is_admin = False
+if "admin_show_login" not in st.session_state:
+    st.session_state.admin_show_login = False
+
 # ---------- Top bar: title + admin login (top right) ----------
 
 top_col1, top_col2 = st.columns([3, 1])
@@ -296,10 +302,6 @@ if "pop_emoji" not in st.session_state:
     st.session_state.pop_emoji = None
 if "pop_emoji_id" not in st.session_state:
     st.session_state.pop_emoji_id = 0
-if "is_admin" not in st.session_state:
-    st.session_state.is_admin = False
-if "admin_show_login" not in st.session_state:
-    st.session_state.admin_show_login = False
 
 
 def _set_pop(emoji: str) -> None:
