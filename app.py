@@ -7,6 +7,37 @@ import streamlit as st  # type: ignore[import-not-found]
 
 
 DATA_FILE = "prof_phrases_history.csv"
+SUPABASE_TABLE = "daily_counts"
+SUPABASE_REQUESTS_TABLE = "save_requests"
+
+ADMIN_USERNAME = "admin123"
+ADMIN_PASSWORD = "password123"
+
+_supabase_client = None
+
+
+def _get_supabase():
+    """Return Supabase client if SUPABASE_URL and SUPABASE_KEY are set, else None."""
+    global _supabase_client
+    if _supabase_client is not None:
+        return _supabase_client
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_KEY")
+    try:
+        if hasattr(st, "secrets") and st.secrets:
+            supabase_config = st.secrets.get("supabase", {})
+            url = url or supabase_config.get("url")
+            key = key or supabase_config.get("key")
+    except Exception:
+        pass
+    if url and key:
+        try:
+            from supabase import create_client  # type: ignore[import-not-found]
+            _supabase_client = create_client(url, key)
+            return _supabase_client
+        except Exception:
+            pass
+    return None
 
 
 def _normalize_history_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -41,22 +72,40 @@ def _normalize_history_df(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_history() -> pd.DataFrame:
-    """Load historical daily counts from CSV, if it exists."""
+    """Load historical daily counts from Supabase (if configured) or from CSV."""
+    supabase = _get_supabase()
+    if supabase is not None:
+        try:
+            resp = supabase.table(SUPABASE_TABLE).select("*").order("class_date").execute()
+            rows = resp.data or []
+            if not rows:
+                return _normalize_history_df(pd.DataFrame())
+            df = pd.DataFrame(rows)
+            df = df.rename(columns={"class_date": "date"})
+            df["date"] = pd.to_datetime(df["date"]).dt.date
+            return _normalize_history_df(df[["date", "are_you_with_me", "thumbs_up"]])
+        except Exception:
+            return _normalize_history_df(pd.DataFrame())
     if os.path.exists(DATA_FILE):
         raw_df = pd.read_csv(DATA_FILE)
         return _normalize_history_df(raw_df)
-    else:
-        return _normalize_history_df(pd.DataFrame())
+    return _normalize_history_df(pd.DataFrame())
 
 
 def save_daily_counts(class_date: date, are_count: int, thumbs_count: int) -> None:
     """
     Save the counts for a given date.
-
-    The 'date' column acts as a primary key:
-    - If a row for this date already exists, it is overwritten.
-    - Otherwise a new row is added.
+    Uses Supabase if configured (one row per date; latest save wins). Otherwise uses CSV.
     """
+    supabase = _get_supabase()
+    if supabase is not None:
+        row = {
+            "class_date": class_date.isoformat(),
+            "are_you_with_me": are_count,
+            "thumbs_up": thumbs_count,
+        }
+        supabase.table(SUPABASE_TABLE).upsert(row, on_conflict="class_date").execute()
+        return
     df = load_history()
     new_row = pd.DataFrame(
         {
@@ -65,13 +114,77 @@ def save_daily_counts(class_date: date, are_count: int, thumbs_count: int) -> No
             "thumbs_up": [thumbs_count],
         }
     )
-
-    # Enforce uniqueness on the date column by dropping any existing rows
     if not df.empty and "date" in df.columns:
         df = df[df["date"] != class_date]
-
     df = pd.concat([df, new_row], ignore_index=True)
     df.to_csv(DATA_FILE, index=False)
+
+
+def submit_save_request(class_date: date, are_count: int, thumbs_count: int) -> bool:
+    """Submit a save request (pending approval). Returns True if submitted, False if no Supabase."""
+    supabase = _get_supabase()
+    if supabase is None:
+        return False
+    row = {
+        "class_date": class_date.isoformat(),
+        "are_you_with_me": are_count,
+        "thumbs_up": thumbs_count,
+        "status": "pending",
+    }
+    supabase.table(SUPABASE_REQUESTS_TABLE).insert(row).execute()
+    return True
+
+
+def get_pending_requests() -> list[dict]:
+    """Return list of pending save requests (each has id, class_date, are_you_with_me, thumbs_up, created_at)."""
+    supabase = _get_supabase()
+    if supabase is None:
+        return []
+    try:
+        resp = (
+            supabase.table(SUPABASE_REQUESTS_TABLE)
+            .select("*")
+            .eq("status", "pending")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return list(resp.data or [])
+    except Exception:
+        return []
+
+
+def approve_request(request_id: str) -> None:
+    """Approve a request: add to daily_counts and mark request approved."""
+    supabase = _get_supabase()
+    if supabase is None:
+        return
+    resp = (
+        supabase.table(SUPABASE_REQUESTS_TABLE)
+        .select("class_date, are_you_with_me, thumbs_up")
+        .eq("id", request_id)
+        .single()
+        .execute()
+    )
+    if not resp.data:
+        return
+    row = resp.data
+    supabase.table(SUPABASE_TABLE).upsert(
+        {
+            "class_date": row["class_date"],
+            "are_you_with_me": row["are_you_with_me"],
+            "thumbs_up": row["thumbs_up"],
+        },
+        on_conflict="class_date",
+    ).execute()
+    supabase.table(SUPABASE_REQUESTS_TABLE).update({"status": "approved"}).eq("id", request_id).execute()
+
+
+def reject_request(request_id: str) -> None:
+    """Mark a request as rejected."""
+    supabase = _get_supabase()
+    if supabase is None:
+        return
+    supabase.table(SUPABASE_REQUESTS_TABLE).update({"status": "rejected"}).eq("id", request_id).execute()
 
 
 st.set_page_config(page_title="CC6 TRACKER", layout="centered")
@@ -135,12 +248,41 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.title("CC6 TRACKER")
+# ---------- Top bar: title + admin login (top right) ----------
 
-st.write(
-    "Track how many times the guy says "
-    "`ARE YOU WITH ME?` and `THUMBS UP` during class."
-)
+top_col1, top_col2 = st.columns([3, 1])
+with top_col1:
+    st.title("CC6 TRACKER")
+    st.write(
+        "Track how many times the guy says "
+        "`ARE YOU WITH ME?` and `THUMBS UP` during class."
+    )
+with top_col2:
+    if st.session_state.is_admin:
+        if st.button("Admin (logout)"):
+            st.session_state.is_admin = False
+            st.rerun()
+        st.caption("Logged in as admin")
+    else:
+        if st.button("Admin login"):
+            st.session_state.admin_show_login = not st.session_state.admin_show_login
+            st.rerun()
+        if st.session_state.admin_show_login:
+            with st.form("admin_login_form"):
+                un = st.text_input("Username", key="admin_un")
+                pw = st.text_input("Password", type="password", key="admin_pw")
+                login_clicked = st.form_submit_button("Log in")
+                cancel_clicked = st.form_submit_button("Cancel")
+                if login_clicked:
+                    if un == ADMIN_USERNAME and pw == ADMIN_PASSWORD:
+                        st.session_state.is_admin = True
+                        st.session_state.admin_show_login = False
+                        st.rerun()
+                    else:
+                        st.error("Invalid username or password")
+                if cancel_clicked:
+                    st.session_state.admin_show_login = False
+                    st.rerun()
 
 # ---------- Initialize session state ----------
 
@@ -154,6 +296,10 @@ if "pop_emoji" not in st.session_state:
     st.session_state.pop_emoji = None
 if "pop_emoji_id" not in st.session_state:
     st.session_state.pop_emoji_id = 0
+if "is_admin" not in st.session_state:
+    st.session_state.is_admin = False
+if "admin_show_login" not in st.session_state:
+    st.session_state.admin_show_login = False
 
 
 def _set_pop(emoji: str) -> None:
@@ -255,15 +401,26 @@ st.markdown('<div class="save-btn-anchor"></div>', unsafe_allow_html=True)
 if st.button("Save this date to history", type="primary"):
     if st.session_state.are_count == 0 and st.session_state.thumbs_count == 0:
         st.warning("Counts are both zero. Did you mean to save?")
-    save_daily_counts(
-        selected_date,
-        st.session_state.are_count,
-        st.session_state.thumbs_count,
-    )
-    st.success("Date saved to history (existing entry, if any, was updated).")
-    # Optionally reset after saving
-    st.session_state.are_count = 0
-    st.session_state.thumbs_count = 0
+    elif st.session_state.is_admin or _get_supabase() is None:
+        save_daily_counts(
+            selected_date,
+            st.session_state.are_count,
+            st.session_state.thumbs_count,
+        )
+        st.success("Date saved to history (existing entry, if any, was updated).")
+        st.session_state.are_count = 0
+        st.session_state.thumbs_count = 0
+    else:
+        if submit_save_request(
+            selected_date,
+            st.session_state.are_count,
+            st.session_state.thumbs_count,
+        ):
+            st.success("Submitted for approval. The admin will review your counts.")
+            st.session_state.are_count = 0
+            st.session_state.thumbs_count = 0
+        else:
+            st.error("Could not submit. Database may not be configured.")
 
 st.divider()
 
@@ -277,22 +434,47 @@ if st.button("Show / hide statistics"):
 if st.session_state.show_stats:
     history_df = load_history()
 
-    if history_df.empty:
+    view_options = (
+        ["Requests", "Line chart", "Bar chart", "Pie chart", "Stats table", "Raw data"]
+        if st.session_state.is_admin and _get_supabase() is not None
+        else ["Line chart", "Bar chart", "Pie chart", "Stats table", "Raw data"]
+    )
+    view = st.radio(
+        "Choose what to display",
+        view_options,
+        horizontal=True,
+    )
+
+    if view == "Requests":
+        pending = get_pending_requests()
+        if not pending:
+            st.info("No pending requests.")
+        else:
+            st.write("**Pending save requests (approve or reject):**")
+            for r in pending:
+                req_id = r["id"]
+                class_date = r.get("class_date", "?")
+                are_val = r.get("are_you_with_me", 0)
+                thumbs_val = r.get("thumbs_up", 0)
+                created = r.get("created_at", "")[:19] if r.get("created_at") else ""
+                c1, c2, c3, c4 = st.columns([2, 1, 1, 2])
+                with c1:
+                    st.write(f"**Date:** {class_date} — Are you with me: **{are_val}**, Thumbs up: **{thumbs_val}**")
+                    if created:
+                        st.caption(f"Submitted {created}")
+                with c2:
+                    if st.button("Approve", key=f"approve_{req_id}"):
+                        approve_request(req_id)
+                        st.rerun()
+                with c3:
+                    if st.button("Reject", key=f"reject_{req_id}"):
+                        reject_request(req_id)
+                        st.rerun()
+                st.divider()
+    elif history_df.empty:
         st.info("No history yet. Start counting and save a date first.")
     else:
         history_df = history_df.sort_values("date")
-
-        view = st.radio(
-            "Choose what to display",
-            [
-                "Line chart",
-                "Bar chart",
-                "Pie chart",
-                "Stats table",
-                "Raw data",
-            ],
-            horizontal=True,
-        )
 
         long_df = history_df.melt(
             id_vars=["date"],
