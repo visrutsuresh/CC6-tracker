@@ -1,8 +1,0 @@
-[global]
-showEmailPrompt = false
-
-[server]
-headless = true
-
-[theme]
-primaryColor = "#22c55e"
