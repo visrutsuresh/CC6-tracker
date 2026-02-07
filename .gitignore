@@ -19,6 +19,11 @@ __pycache__/
 .env.local
 .streamlit/secrets.toml
 
+# Node
+node_modules/
+web/dist/
+web/node_modules/
+
 # IDE and OS
 .idea/
 .vscode/

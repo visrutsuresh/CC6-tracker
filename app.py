@@ -243,6 +243,16 @@ st.markdown(
         40%  { transform: scale(1.4); opacity: 1; }
         100% { transform: scale(1.2); opacity: 0; }
     }
+
+    /* Position login button at 1600px from left */
+    div[data-testid="stHorizontalBlock"]:first-of-type {
+        position: relative;
+    }
+    div[data-testid="stHorizontalBlock"]:first-of-type > div[data-testid="column"]:nth-child(3) {
+        position: absolute !important;
+        left: 1600px !important;
+        top: 0 !important;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -256,7 +266,7 @@ if "admin_show_login" not in st.session_state:
 
 # ---------- Top bar: title + admin login (top right) ----------
 
-top_col1, top_col2 = st.columns([3, 1])
+top_col1, top_col2, top_col3 = st.columns([2, 4, 1])
 with top_col1:
     st.title("CC6 TRACKER")
     st.write(
@@ -264,6 +274,8 @@ with top_col1:
         "`ARE YOU WITH ME?` and `THUMBS UP` during class."
     )
 with top_col2:
+    st.write("")  # Spacer to push login to far right
+with top_col3:
     if st.session_state.is_admin:
         if st.button("Admin (logout)"):
             st.session_state.is_admin = False

@@ -1,0 +1,76 @@
+:root {
+  --bg: #0f0f12;
+  --bg-elevated: #1a1a20;
+  --surface: #24242c;
+  --border: #333340;
+  --text: #f4f4f5;
+  --text-muted: #a1a1aa;
+  --accent-green: #22c55e;
+  --accent-green-hover: #16a34a;
+  --accent-red: #ef4444;
+  --accent-red-hover: #dc2626;
+  --accent-blue: #3b82f6;
+  --accent-blue-hover: #2563eb;
+  --font-sans: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius: 10px;
+  --radius-sm: 6px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+#root {
+  min-height: 100vh;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+button {
+  font-family: var(--font-sans);
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+input {
+  font-family: var(--font-sans);
+}
+
+/* Pop emoji overlay */
+.pop-emoji-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.pop-emoji {
+  font-size: 5rem;
+  animation: popFade 0.7s ease-out forwards;
+}
+
+@keyframes popFade {
+  0%   { transform: scale(0.3); opacity: 1; }
+  40%  { transform: scale(1.4); opacity: 1; }
+  100% { transform: scale(1.2); opacity: 0; }
+}
