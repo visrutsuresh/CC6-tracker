@@ -35,8 +35,6 @@ jobs:
         working-directory: web
         run: npm run build
         env:
-          # Change base path to match your repo (e.g. /cc6-tracker/ for username.github.io/cc6-tracker)
-          VITE_BASE_PATH: "/cc6-tracker/"
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 

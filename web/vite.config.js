@@ -3,6 +3,6 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  // For GitHub Pages: VITE_BASE_PATH is set in the deploy workflow to match your repo name
-  base: process.env.VITE_BASE_PATH || '/',
+  // Use relative paths so assets load correctly from any subpath (e.g. GitHub Pages /cc6-tracker/)
+  base: './',
 })
