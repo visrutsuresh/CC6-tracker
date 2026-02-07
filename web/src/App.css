@@ -104,6 +104,17 @@
   background: var(--border);
 }
 
+.btn-login {
+  background: #1e3a5f;
+  color: white;
+  border-color: #152a45;
+}
+
+.btn-login:hover {
+  background: #152a45;
+  border-color: #0d1f33;
+}
+
 .btn-sm {
   padding: 0.35rem 0.75rem;
   font-size: 0.85rem;

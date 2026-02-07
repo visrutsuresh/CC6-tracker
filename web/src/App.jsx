@@ -224,7 +224,7 @@ function App() {
           ) : (
             <>
               <button
-                className="btn btn-secondary btn-sm"
+                className="btn btn-login btn-sm"
                 onClick={() => setShowLogin(!showLogin)}
               >
                 Admin login
